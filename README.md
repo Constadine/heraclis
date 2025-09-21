@@ -2,8 +2,6 @@
 
 HeraCLIs is a sophisticated, yet easy-to-use, command-line tool for logging your home workout exercises. It's designed for quick and efficient logging, helping you track your daily movement and exercise habits with a beautiful and intuitive terminal interface.
 
-![Screenshot](https://i.imgur.com/example.png) <!--- Placeholder for a screenshot -->
-
 ## Features
 
 -   🏋️ **Quick Workout Logging**: Log your workouts with a few keystrokes.
