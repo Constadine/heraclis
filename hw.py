@@ -57,10 +57,6 @@ def save_settings(data: dict):
 
 app_settings = load_settings()
 
-def clear_screen():
-    """Clear the terminal screen using Rich's built-in functionality."""
-    console.clear()
-
 
 def show_today_goals():
     """Display today's schedule and progress."""
@@ -162,7 +158,7 @@ def show_menu():
     table.add_row("4", "Manage Exercises")
     table.add_row("5", "Timer")
     table.add_row("6", "Settings")
-    table.add_row("7", "Exit")
+    table.add_row("q", "Exit")
     console.print(table)
 
 
@@ -207,12 +203,10 @@ def add_workout():
         })
 
     console.print(table)
-    console.print("[dim]0. Other exercise[/dim]")
-
     try:
-        order_choice = IntPrompt.ask("Select exercise (#, 0=Other)", default=0)
-
-        if order_choice == 0:
+        order_choice = Prompt.ask("Select exercise (#, 0=Other, q=Cancel)", default="q")
+        
+        if order_choice == "0":
             # Let the user choose from all available exercises
             all_exercises = db.get_exercises()
             if not all_exercises:
@@ -233,8 +227,13 @@ def add_workout():
 
             console.print(all_table)
 
-            exercise_id = IntPrompt.ask("Select exercise (ID)")
-            selected_exercise = db.get_exercise_by_id(exercise_id)
+            exercise_id = Prompt.ask("Select exercise (ID, q to cancel)", default="q")
+            
+            if exercise_id == "q":
+                console.print("[yellow]Operation cancelled[/yellow]")
+                return
+                
+            selected_exercise = db.get_exercise_by_id(int(exercise_id))
             if not selected_exercise:
                 console.print("[red]Invalid exercise ID[/red]")
                 return
@@ -255,22 +254,22 @@ def add_workout():
 
             reps = IntPrompt.ask(f"How many {selected_exercise['name']}?", default=default_reps)
 
-            if db.add_workout(selected_exercise["name"], reps):
+            if db.add_workout(selected_exercise["name"], int(reps)):
                 console.print(f"[green]✅ Logged {reps} {selected_exercise['name']}[/green]")
             else:
                 console.print("[red]❌ Failed to log workout[/red]")
                 return
 
         else:
-            selected = next((r for r in rows if r["order"] == order_choice), None)
+            selected = next((r for r in rows if r["order"] == int(order_choice)), None)
             if not selected:
                 console.print("[red]Invalid choice[/red]")
                 return
 
             default_reps = max(1, selected["left"]) or 1
-            reps = IntPrompt.ask(f"How many {selected['name']}?", default=default_reps)
+            reps = Prompt.ask(f"How many {selected['name']}?", default=default_reps)
 
-            if db.add_workout(selected["name"], reps):
+            if db.add_workout(selected["name"], int(reps)):
                 console.print(f"[green]✅ Logged {reps} {selected['name']}[/green]")
             else:
                 console.print("[red]❌ Failed to log workout[/red]")
@@ -298,15 +297,26 @@ def random_workout():
     console.print(panel)
     
     # Get number of exercises from user
-    max_exercises = len(all_exercises)
-    num_exercises = IntPrompt.ask(
-        f"How many exercises do you want? (1-{max_exercises})", 
-        default=max_exercises
-    )
-    
-    # Validate input
-    if num_exercises < 1 or num_exercises > max_exercises:
-        console.print(f"[red]Please choose between 1 and {max_exercises} exercises.[/red]")
+    max_exercises = len(all_exercises)    
+    try:
+        num_exercises_input = Prompt.ask(
+            f"How many exercises do you want? (1-{max_exercises}, q to cancel)", 
+            default="q"
+        )
+        
+        if num_exercises_input.lower() == "q":
+            console.print("[yellow]Operation cancelled[/yellow]")
+            return
+            
+        num_exercises = int(num_exercises_input)
+        
+        # Validate input
+        if num_exercises < 1 or num_exercises > max_exercises:
+            console.print(f"[red]Please choose between 1 and {max_exercises} exercises.[/red]")
+            return
+            
+    except ValueError:
+        console.print("[red]Invalid number. Please enter a number between 1 and {max_exercises}.[/red]")
         return
     
     # Loop to allow retry/reroll before saving
@@ -507,11 +517,14 @@ def manage_exercises():
         console.print("3. Manage Tags")
         console.print("4. Update Exercise Tags")
         console.print("5. Adjust Goals")
-        console.print("6. Back to Main Menu")
+        console.print("q. Back to Main Menu")
+
         
-        choice = Prompt.ask("Choose option", choices=["1", "2", "3", "4", "5", "6"], default="1")
+        choice = Prompt.ask("Choose option", choices=["1", "2", "3", "4", "5", "q"], default="q")
         
-        if choice == "1":
+        if choice == "q":
+            break
+        elif choice == "1":
             exercises = db.get_exercises()
             if exercises:
                 table = Table(title="Available Exercises")
@@ -571,9 +584,6 @@ def manage_exercises():
         elif choice == "5":
             adjust_goals()
 
-        elif choice == "6":
-            break
-
 
 def manage_tags():
     """Manage available tags."""
@@ -581,11 +591,15 @@ def manage_tags():
         console.print("\n[bold blue]Tag Management[/bold blue]")
         console.print("1. View Tags")
         console.print("2. Add Tag")
-        console.print("3. Back to Exercise Management")
+        console.print("3. Edit Tag Color")
+        console.print("q. Back to Exercise Management")
+
         
-        choice = Prompt.ask("Choose option", choices=["1", "2", "3"], default="1")
+        choice = Prompt.ask("Choose option", choices=["1", "2", "3", "q"], default="q")
         
-        if choice == "1":
+        if choice == "q":
+            break
+        elif choice == "1":
             tags = db.get_all_tags()
             if tags:
                 table = Table(title="Available Tags")
@@ -610,7 +624,52 @@ def manage_tags():
                 console.print(f"[red]❌ Failed to add tag: {name}[/red]")
         
         elif choice == "3":
-            break
+            edit_tag_color()
+
+
+def edit_tag_color():
+    """Edit the color of an existing tag."""
+    tags = db.get_all_tags()
+    if not tags:
+        console.print("[red]No tags available![/red]")
+        return
+    
+    # Display tags
+    table = Table(title="Select Tag to Edit Color")
+    table.add_column("ID", style="cyan")
+    table.add_column("Name", style="magenta")
+    table.add_column("Current Color", style="green")
+    
+    for tag in tags:
+        color_display = f"[{tag['color']}]●[/{tag['color']}] {tag['color']}"
+        table.add_row(str(tag["id"]), tag["name"], color_display)
+    
+    console.print(table)    
+    try:
+        tag_id = IntPrompt.ask("Select tag ID to edit color (q to cancel)", default="q")
+        
+        if tag_id == "q":
+            console.print("[yellow]Operation cancelled[/yellow]")
+            return
+            
+        selected_tag = next((t for t in tags if t["id"] == tag_id), None)
+        
+        if not selected_tag:
+            console.print("[red]Invalid tag ID![/red]")
+            return
+        
+        console.print(f"\n[bold]Editing color for: {selected_tag['name']}[/bold]")
+        console.print(f"Current color: [{selected_tag['color']}]●[/{selected_tag['color']}] {selected_tag['color']}")
+        
+        new_color = Prompt.ask("New color (hex code, e.g., #ff0000)", default=selected_tag['color'])
+        
+        if db.update_tag_color(tag_id, new_color):
+            console.print(f"[green]✅ Updated color for {selected_tag['name']} to {new_color}[/green]")
+        else:
+            console.print("[red]❌ Failed to update tag color[/red]")
+            
+    except (ValueError, KeyboardInterrupt):
+        console.print("[yellow]Operation cancelled[/yellow]")
 
 
 def update_exercise_tags():
@@ -636,10 +695,14 @@ def update_exercise_tags():
         
         table.add_row(str(exercise["id"]), exercise["name"], tags_str)
     
-    console.print(table)
-    
+    console.print(table)    
     try:
-        exercise_id = IntPrompt.ask("Select exercise ID to update tags")
+        exercise_id = IntPrompt.ask("Select exercise ID to update tags (q to cancel)", default="q")
+        
+        if exercise_id == "q":
+            console.print("[yellow]Operation cancelled[/yellow]")
+            return
+            
         selected_exercise = db.get_exercise_by_id(exercise_id)
         
         if not selected_exercise:
@@ -704,7 +767,12 @@ def adjust_goals():
     console.print(table)
 
     try:
-        ex_id = IntPrompt.ask("Select exercise ID to adjust")
+        ex_id = IntPrompt.ask("Select exercise ID to adjust (q to cancel)", default="q")
+        
+        if ex_id == "q":
+            console.print("[yellow]Operation cancelled[/yellow]")
+            return
+            
         ex_row = next((r for r in rows if r["id"] == ex_id), None)
         if not ex_row:
             console.print("[red]Invalid exercise ID[/red]")
@@ -742,7 +810,7 @@ def adjust_goals():
 
 def main():
     """Main application loop."""
-    clear_screen()
+    console.clear()
     console.print("[bold green]νους υγιής εν σώματι υγιεί[/bold green]")
     
     # Always show today's goals first
@@ -751,39 +819,39 @@ def main():
     while True:
         try:
             show_menu()
-            choice = Prompt.ask("Choose option", choices=["1", "2", "3", "4", "5", "6", "7"], default="1")
+            choice = Prompt.ask("Choose option", choices=["1", "2", "3", "4", "5", "6", "q"], default="q")
             
             if choice == "1":
-                clear_screen()
+                console.clear()
                 add_workout()
                 # Show updated goals after logging
                 console.print("\n")
                 show_today_goals()
             elif choice == "2":
-                clear_screen()
+                console.clear()
                 random_workout()
                 # Show updated goals after logging
                 console.print("\n")
                 show_today_goals()
             elif choice == "3":
-                clear_screen()
+                console.clear()
                 show_stats()
             elif choice == "4":
-                clear_screen()
+                console.clear()
                 manage_exercises()
             elif choice == "5":
-                clear_screen()
+                console.clear()
                 start_timer()
             elif choice == "6":
-                clear_screen()
+                console.clear()
                 settings_menu()
-            elif choice == "7":
-                clear_screen()
-                console.print("[bold green]Keep up the great work! 💪[/bold green]")
+            elif choice == "q":
+                console.clear()
+                console.print("[bold green]See you later chief 💪[/bold green]")
                 break
                 
         except KeyboardInterrupt:
-            clear_screen()
+            console.clear()
             console.print("[yellow]Goodbye! Keep moving! 💪[/yellow]")
             break
         except Exception as e:
@@ -798,13 +866,13 @@ def main():
 def cli(stats, goals, random, add):
     """HeraCLIs - A simple CLI tool for logging workouts."""
     if stats:
-        clear_screen()
+        console.clear()
         show_stats()
     elif goals:
-        clear_screen()
+        console.clear()
         show_today_goals()
     elif random:
-        clear_screen()
+        console.clear()
         random_workout()
     elif add:
         # Quick add format: "exercise_name reps"
@@ -885,12 +953,12 @@ def settings_menu():
         table.add_column("Option", style="magenta", justify="center")
         table.add_column("Name", style="white")
         table.add_column("Value", style="green")
+        table.add_row("q", "Back to Main Menu", "")
         table.add_row("1", "Timer Sound", app_settings.get("timer_sound", "timer.wav"))
-        table.add_row("2", "Back", "")
         console.print(table)
 
-        choice = Prompt.ask("Select option", choices=["1", "2"], default="2")
-        if choice == "2":
+        choice = Prompt.ask("Select option", choices=["q", "1"], default="q")
+        if choice == "q":
             return
 
         if choice == "1":

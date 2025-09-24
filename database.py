@@ -113,10 +113,10 @@ class WorkoutDB:
                 default_tags = [
                     ("Chest", "#e74c3c"),
                     ("Front Delts", "#f39c12"),
-                    ("Triceps", "#9b59b6"),
+                    ("Triceps", "#DECE4E"),
                     ("Core", "#2ecc71"),
                     ("Glutes", "#1abc9c"),
-                    ("Quads", "#34495e"),
+                    ("Quads", "#68D9CD"),
                     ("Hamstrings", "#16a085"),
                     ("Calves", "#27ae60"),
                     ("Back", "#2980b9"),
@@ -177,14 +177,14 @@ class WorkoutDB:
         
         # Define default goals for each exercise
         default_goals = [
-            ("Pushups", 50, 300),      # 50 daily, 300 weekly
-            ("Squats", 50, 200),       # 30 daily, 200 weekly
-            ("Squat & Lunge", 20, 140), # 20 daily, 140 weekly
-            ("Planks", 3, 15),         # 3 minutes daily, 15 minutes weekly
-            ("Dead Bugs", 60, 180),    # 20 daily, 140 weekly
-            ("Glute Bridges", 30, 200), # 30 daily, 200 weekly
-            ("Lunges", 20, 140),       # 20 daily, 140 weekly
-            ("Crunches", 50, 300),     # 50 daily, 300 weekly
+            ("Pushups", 50, 300),
+            ("Squats", 50, 200),
+            ("Squat & Lunge", 20, 140),
+            ("Planks", 3, 15),
+            ("Dead Bugs", 60, 180),
+            ("Glute Bridges", 30, 200),
+            ("Lunges", 60, 140),
+            ("Crunches", 50, 300),
         ]
         
         # Insert default goals
@@ -501,7 +501,7 @@ class WorkoutDB:
         """Get all available tags."""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT id, name, color FROM tags ORDER BY name")
+            cursor.execute("SELECT id, name, color FROM tags ORDER BY id")
             return [{"id": row[0], "name": row[1], "color": row[2]} for row in cursor.fetchall()]
     
     def add_tag(self, name: str, color: str = "#3498db") -> bool:
@@ -517,6 +517,18 @@ class WorkoutDB:
             return False
         except sqlite3.Error as e:
             print(f"Error adding tag: {e}")
+            return False
+    
+    def update_tag_color(self, tag_id: int, color: str) -> bool:
+        """Update the color of an existing tag."""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("UPDATE tags SET color = ? WHERE id = ?", (color, tag_id))
+                conn.commit()
+                return cursor.rowcount > 0
+        except sqlite3.Error as e:
+            print(f"Error updating tag color: {e}")
             return False
     
     def add_exercise_with_tags(self, name: str, description: str = "", tag_names: List[str] = None) -> bool:
