@@ -896,3 +896,111 @@ class WorkoutDB:
             
             row = cursor.fetchone()
             return row[0] if row else 0
+    
+    def add_exercise_to_schedule(self, exercise_id: int, suggested_reps: int = None) -> bool:
+        """Add an exercise to today's schedule."""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                
+                # Check if exercise already exists in today's schedule
+                cursor.execute("""
+                    SELECT id FROM todays_schedule WHERE exercise_id = ?
+                """, (exercise_id,))
+                if cursor.fetchone():
+                    print(f"Exercise already exists in today's schedule!")
+                    return False
+                
+                # Get the next order index
+                cursor.execute("""
+                    SELECT COALESCE(MAX(order_index), 0) + 1 FROM todays_schedule
+                """)
+                next_order = cursor.fetchone()[0]
+                
+                # If no suggested reps provided, try to get from goal
+                if suggested_reps is None:
+                    goal = self.get_goal_by_exercise_id(exercise_id)
+                    suggested_reps = goal['daily_target'] if goal and goal['daily_target'] > 0 else 20
+                
+                # Insert the exercise
+                cursor.execute("""
+                    INSERT INTO todays_schedule (exercise_id, order_index, suggested_reps)
+                    VALUES (?, ?, ?)
+                """, (exercise_id, next_order, suggested_reps))
+                
+                conn.commit()
+                return True
+        except sqlite3.Error as e:
+            print(f"Error adding exercise to schedule: {e}")
+            return False
+    
+    def remove_exercise_from_schedule(self, exercise_id: int) -> bool:
+        """Remove an exercise from today's schedule."""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                
+                # Check if exercise exists in schedule
+                cursor.execute("""
+                    SELECT id FROM todays_schedule WHERE exercise_id = ?
+                """, (exercise_id,))
+                if not cursor.fetchone():
+                    print(f"Exercise not found in today's schedule!")
+                    return False
+                
+                # Remove the exercise
+                cursor.execute("""
+                    DELETE FROM todays_schedule WHERE exercise_id = ?
+                """, (exercise_id,))
+                
+                # Reorder remaining exercises
+                cursor.execute("""
+                    UPDATE todays_schedule 
+                    SET order_index = (
+                        SELECT COUNT(*) + 1 
+                        FROM todays_schedule ts2 
+                        WHERE ts2.order_index < todays_schedule.order_index
+                    )
+                """)
+                
+                conn.commit()
+                return True
+        except sqlite3.Error as e:
+            print(f"Error removing exercise from schedule: {e}")
+            return False
+    
+    def get_available_exercises_for_schedule(self) -> List[Dict]:
+        """Get exercises that are not already in today's schedule."""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT e.id, e.name, e.description,
+                       GROUP_CONCAT(t.name, ',') as tags,
+                       GROUP_CONCAT(t.color, ',') as tag_colors
+                FROM exercises e
+                LEFT JOIN exercise_tags et ON e.id = et.exercise_id
+                LEFT JOIN tags t ON et.tag_id = t.id
+                WHERE e.id NOT IN (
+                    SELECT exercise_id FROM todays_schedule
+                )
+                GROUP BY e.id, e.name, e.description
+                ORDER BY e.id
+            """)
+            
+            exercises = []
+            for row in cursor.fetchall():
+                exercise = {
+                    "id": row[0],
+                    "name": row[1],
+                    "description": row[2],
+                    "tags": []
+                }
+                if row[3]:  # if tags exist
+                    tag_names = row[3].split(',')
+                    tag_colors = row[4].split(',') if row[4] else []
+                    exercise["tags"] = [
+                        {"name": name, "color": color} 
+                        for name, color in zip(tag_names, tag_colors)
+                    ]
+                exercises.append(exercise)
+            return exercises

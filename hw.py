@@ -154,10 +154,12 @@ def show_menu():
     table.add_column("Description", style="white")
     table.add_row("1", "Log Reps")
     table.add_row("2", "Randomize today's workout")
-    table.add_row("3", "Show Stats")
-    table.add_row("4", "Manage Exercises")
-    table.add_row("5", "Timer")
-    table.add_row("6", "Settings")
+    table.add_row("3", "Add exercise to workout")
+    table.add_row("4", "Remove exercise from workout")
+    table.add_row("5", "Show Stats")
+    table.add_row("6", "Manage Exercises")
+    table.add_row("7", "Timer")
+    table.add_row("8", "Settings")
     table.add_row("q", "Exit")
     console.print(table)
 
@@ -808,6 +810,138 @@ def adjust_goals():
     except (ValueError, KeyboardInterrupt):
         console.print("[yellow]Operation cancelled[/yellow]")
 
+
+def add_exercise_to_workout():
+    """Add an exercise to today's active workout."""
+    # Get available exercises (not already in schedule)
+    available_exercises = db.get_available_exercises_for_schedule()
+    
+    if not available_exercises:
+        console.print("[yellow]No exercises available to add! All exercises are already in today's workout.[/yellow]")
+        return
+    
+    # Display available exercises
+    table = Table(title="Add Exercise to Today's Workout", box=box.ROUNDED, style="cyan")
+    table.add_column("ID", style="magenta", justify="center", width=3)
+    table.add_column("Exercise", style="cyan", width=20)
+    table.add_column("Description", style="white", width=25)
+    table.add_column("Muscles", style="yellow", width=20)
+    
+    for exercise in available_exercises:
+        # Format tags for display
+        tags_str = ""
+        if exercise.get("tags"):
+            tag_display = []
+            for tag in exercise["tags"]:
+                tag_display.append(f"[{tag['color']}]{tag['name']}[/{tag['color']}]")
+            tags_str = ", ".join(tag_display)
+        
+        table.add_row(
+            str(exercise["id"]),
+            exercise["name"],
+            exercise.get("description", ""),
+            tags_str
+        )
+    
+    console.print(table)
+    
+    try:
+        exercise_id = IntPrompt.ask("Select exercise ID to add (q to cancel)", default="q")
+        
+        if exercise_id == "q":
+            console.print("[yellow]Operation cancelled[/yellow]")
+            return
+        
+        # Find the selected exercise
+        selected_exercise = next((ex for ex in available_exercises if ex["id"] == exercise_id), None)
+        if not selected_exercise:
+            console.print("[red]Invalid exercise ID[/red]")
+            return
+        
+        # Ask for suggested reps
+        goal = db.get_goal_by_exercise_id(exercise_id)
+        default_reps = goal['daily_target'] if goal and goal['daily_target'] > 0 else 20
+        
+        suggested_reps = IntPrompt.ask(
+            f"Suggested reps for {selected_exercise['name']}?", 
+            default=default_reps
+        )
+        
+        if db.add_exercise_to_schedule(exercise_id, suggested_reps):
+            console.print(f"[green]✅ Added {selected_exercise['name']} to today's workout![/green]")
+            console.print(f"[green]   Suggested reps: {suggested_reps}[/green]")
+        else:
+            console.print("[red]❌ Failed to add exercise to workout[/red]")
+    
+    except (ValueError, KeyboardInterrupt):
+        console.print("[yellow]Operation cancelled[/yellow]")
+
+
+def remove_exercise_from_workout():
+    """Remove an exercise from today's active workout."""
+    # Get today's schedule
+    schedule = db.get_todays_schedule()
+    
+    if not schedule:
+        console.print("[yellow]No exercises in today's workout to remove![/yellow]")
+        return
+    
+    # Display current schedule
+    table = Table(title="Remove Exercise from Today's Workout", box=box.ROUNDED, style="cyan")
+    table.add_column("#", style="magenta", justify="center", width=3)
+    table.add_column("Exercise", style="cyan", width=20)
+    table.add_column("Goal Reps", style="green", width=12)
+    table.add_column("Description", style="white", width=25)
+    table.add_column("Muscles", style="yellow", width=20)
+    
+    for exercise in schedule:
+        # Format tags for display
+        tags_str = ""
+        if exercise.get("tags"):
+            tag_display = []
+            for tag in exercise["tags"]:
+                tag_display.append(f"[{tag['color']}]{tag['name']}[/{tag['color']}]")
+            tags_str = ", ".join(tag_display)
+        
+        # Format reps display
+        unit = "sec" if "plank" in exercise['exercise_name'].lower() else "reps"
+        goal_display = f"{exercise['suggested_reps']} {unit}" if exercise['suggested_reps'] else "N/A"
+        
+        table.add_row(
+            str(exercise['order_index']),
+            exercise['exercise_name'],
+            goal_display,
+            exercise.get('description', ''),
+            tags_str
+        )
+    
+    console.print(table)
+    
+    try:
+        order_choice = IntPrompt.ask("Select exercise # to remove (q to cancel)", default="q")
+        
+        if order_choice == "q":
+            console.print("[yellow]Operation cancelled[/yellow]")
+            return
+        
+        # Find the selected exercise
+        selected_exercise = next((ex for ex in schedule if ex['order_index'] == order_choice), None)
+        if not selected_exercise:
+            console.print("[red]Invalid exercise number[/red]")
+            return
+        
+        # Confirm removal
+        if Confirm.ask(f"Remove {selected_exercise['exercise_name']} from today's workout?"):
+            if db.remove_exercise_from_schedule(selected_exercise['exercise_id']):
+                console.print(f"[green]✅ Removed {selected_exercise['exercise_name']} from today's workout![/green]")
+            else:
+                console.print("[red]❌ Failed to remove exercise from workout[/red]")
+        else:
+            console.print("[yellow]Operation cancelled[/yellow]")
+    
+    except (ValueError, KeyboardInterrupt):
+        console.print("[yellow]Operation cancelled[/yellow]")
+
 def main():
     """Main application loop."""
     console.clear()
@@ -819,7 +953,7 @@ def main():
     while True:
         try:
             show_menu()
-            choice = Prompt.ask("Choose option", choices=["1", "2", "3", "4", "5", "6", "q"], default="q")
+            choice = Prompt.ask("Choose option", choices=["1", "2", "3", "4", "5", "6", "7", "8", "q"], default="q")
             
             if choice == "1":
                 console.clear()
@@ -835,14 +969,26 @@ def main():
                 show_today_goals()
             elif choice == "3":
                 console.clear()
-                show_stats()
+                add_exercise_to_workout()
+                # Show updated goals after adding
+                console.print("\n")
+                show_today_goals()
             elif choice == "4":
                 console.clear()
-                manage_exercises()
+                remove_exercise_from_workout()
+                # Show updated goals after removing
+                console.print("\n")
+                show_today_goals()
             elif choice == "5":
                 console.clear()
-                start_timer()
+                show_stats()
             elif choice == "6":
+                console.clear()
+                manage_exercises()
+            elif choice == "7":
+                console.clear()
+                start_timer()
+            elif choice == "8":
                 console.clear()
                 settings_menu()
             elif choice == "q":
