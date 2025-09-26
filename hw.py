@@ -158,8 +158,9 @@ def show_menu():
     table.add_row("4", "Remove exercise from workout")
     table.add_row("5", "Show Stats")
     table.add_row("6", "Manage Exercises")
-    table.add_row("7", "Timer")
-    table.add_row("8", "Settings")
+    table.add_row("7", "Edit Today's Reps")
+    table.add_row("8", "Timer")
+    table.add_row("9", "Settings")
     table.add_row("q", "Exit")
     console.print(table)
 
@@ -457,25 +458,32 @@ def show_stats():
         
         console.print(table)
     
-    # 7-day activity chart (bars + sparkline)
+    # 7-day activity chart
     if daily:
         bar_len = 20
         max_val = max([d["total"] for d in daily]) or 1
         lines = []
-        totals_only = []
-        labels_only = []
         for d in daily:
-            totals_only.append(d["total"])
             label = datetime.fromisoformat(d["date"]).strftime("%a")
-            labels_only.append(label)
             filled = int((d["total"] / max_val) * bar_len)
             bar = "█" * filled + "░" * (bar_len - filled)
             lines.append(f"{label:>3} {bar} {d['total']}")
         chart = "\n".join(lines)
-        spark = _sparkline(totals_only)
-        labels_row = " ".join([l[:1] for l in labels_only])
-        combined = f"{chart}\n\n{labels_row}\n{spark}"
-        console.print(Panel(combined, title="📅 Last 7 Days", border_style="cyan"))
+        console.print(Panel(chart, title="📅 Last 7 Days", border_style="cyan"))
+    
+    # Monthly activity chart
+    monthly_data = db.get_monthly_reps()
+    if monthly_data:
+        bar_len = 15
+        max_val = max([m["total"] for m in monthly_data]) or 1
+        lines = []
+        for m in monthly_data:
+            label = m["month"]
+            filled = int((m["total"] / max_val) * bar_len)
+            bar = "█" * filled + "░" * (bar_len - filled)
+            lines.append(f"{label:>8} {bar} {m['total']}")
+        monthly_chart = "\n".join(lines)
+        console.print(Panel(monthly_chart, title="📅 Last 12 Months", border_style="blue"))
 
     # Recent workouts
     if recent_workouts:
@@ -942,6 +950,109 @@ def remove_exercise_from_workout():
     except (ValueError, KeyboardInterrupt):
         console.print("[yellow]Operation cancelled[/yellow]")
 
+
+def edit_logged_reps():
+    """Edit the number of reps for today's logged workouts."""
+    # Get today's workout entries only
+    today = datetime.now().strftime('%Y-%m-%d')
+    entries = db.get_workout_entries(1)  # Only today
+    
+    # Filter to only today's entries
+    today_entries = [entry for entry in entries if entry['date'].startswith(today)]
+    
+    if not today_entries:
+        console.print("[yellow]No workout entries found for today to edit![/yellow]")
+        return
+    
+    # Display today's workout entries with fresh sequential IDs
+    table = Table(title="Edit Today's Logged Reps", box=box.ROUNDED, show_lines=True, style="cyan")
+    table.add_column("#", style="magenta", justify="center", width=3)
+    table.add_column("Time", style="cyan", width=8)
+    table.add_column("Exercise", style="green", width=15)
+    table.add_column("Reps", style="yellow", width=8)
+    
+    # Create a mapping from display ID to actual entry
+    id_mapping = {}
+    for i, entry in enumerate(today_entries, 1):
+        # Format time for display (just the time part)
+        date_obj = datetime.fromisoformat(entry['date'])
+        time_str = date_obj.strftime("%H:%M")
+        
+        # Format reps display
+        unit = "sec" if "plank" in entry['exercise_name'].lower() else "reps"
+        reps_display = f"{entry['reps']} {unit}"
+        
+        table.add_row(
+            str(i),
+            time_str,
+            entry['exercise_name'],
+            reps_display,
+        )
+        
+        # Map display ID to actual database entry
+        id_mapping[i] = entry
+    
+    console.print(table)
+    
+    try:
+        display_id = IntPrompt.ask("Select entry # to edit (q to cancel)", default="q")
+        
+        if display_id == "q":
+            console.print("[yellow]Operation cancelled[/yellow]")
+            return
+        
+        # Find the selected entry using the mapping
+        selected_entry = id_mapping.get(display_id)
+        if not selected_entry:
+            console.print("[red]Invalid entry number[/red]")
+            return
+        
+        # Show current details
+        console.print(f"\n[bold]Editing workout entry:[/bold]")
+        console.print(f"Exercise: {selected_entry['exercise_name']}")
+        console.print(f"Current reps: {selected_entry['reps']}")
+        console.print(f"Date: {datetime.fromisoformat(selected_entry['date']).strftime('%Y-%m-%d %H:%M:%S')}")
+        
+        # Ask what to do
+        console.print("\n[bold]What would you like to do?[/bold]")
+        console.print("1. Edit reps")
+        console.print("2. Delete entry")
+        console.print("q. Cancel")
+        
+        action = Prompt.ask("Choose action", choices=["1", "2", "q"], default="q")
+        
+        if action == "q":
+            console.print("[yellow]Operation cancelled[/yellow]")
+            return
+        elif action == "1":
+            # Ask for new reps
+            new_reps = IntPrompt.ask("Enter new number of reps", default=selected_entry['reps'])
+            
+            if new_reps == selected_entry['reps']:
+                console.print("[yellow]No changes made[/yellow]")
+                return
+            
+            # Confirm the change
+            if Confirm.ask(f"Change {selected_entry['exercise_name']} from {selected_entry['reps']} to {new_reps} reps?"):
+                if db.update_workout_reps(selected_entry['id'], new_reps):
+                    console.print(f"[green]✅ Updated {selected_entry['exercise_name']} to {new_reps} reps[/green]")
+                else:
+                    console.print("[red]❌ Failed to update workout entry[/red]")
+            else:
+                console.print("[yellow]Operation cancelled[/yellow]")
+        elif action == "2":
+            # Confirm deletion
+            if Confirm.ask(f"Delete {selected_entry['exercise_name']} entry with {selected_entry['reps']} reps?"):
+                if db.delete_workout_entry(selected_entry['id']):
+                    console.print(f"[green]✅ Deleted {selected_entry['exercise_name']} entry[/green]")
+                else:
+                    console.print("[red]❌ Failed to delete workout entry[/red]")
+            else:
+                console.print("[yellow]Operation cancelled[/yellow]")
+    
+    except (ValueError, KeyboardInterrupt):
+        console.print("[yellow]Operation cancelled[/yellow]")
+
 def main():
     """Main application loop."""
     console.clear()
@@ -953,7 +1064,7 @@ def main():
     while True:
         try:
             show_menu()
-            choice = Prompt.ask("Choose option", choices=["1", "2", "3", "4", "5", "6", "7", "8", "q"], default="q")
+            choice = Prompt.ask("Choose option", choices=["1", "2", "3", "4", "5", "6", "7", "8", "9", "q"], default="q")
             
             if choice == "1":
                 console.clear()
@@ -987,8 +1098,14 @@ def main():
                 manage_exercises()
             elif choice == "7":
                 console.clear()
-                start_timer()
+                edit_logged_reps()
+                # Show updated goals after editing
+                console.print("\n")
+                show_today_goals()
             elif choice == "8":
+                console.clear()
+                start_timer()
+            elif choice == "9":
                 console.clear()
                 settings_menu()
             elif choice == "q":
@@ -1153,8 +1270,9 @@ def _sparkline(values):
     for v in values:
         idx = int((v / max_val) * (len(blocks) - 1))
         idx = max(0, min(idx, len(blocks) - 1))
-        line.append(blocks[idx])
-    return "".join(line)
+        # Use double-width characters for better alignment
+        line.append(blocks[idx] + blocks[idx])
+    return " ".join(line)
 
 
 if __name__ == "__main__":

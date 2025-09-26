@@ -1004,3 +1004,73 @@ class WorkoutDB:
                     ]
                 exercises.append(exercise)
             return exercises
+    
+    def get_workout_entries(self, days: int = 7) -> List[Dict]:
+        """Get workout entries with IDs for editing purposes."""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            # Use local timezone for date comparison
+            local_date = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            cursor.execute("""
+                SELECT id, date, exercise_name, reps, set_number
+                FROM workouts
+                WHERE date >= datetime(?, '-{} days')
+                ORDER BY date DESC
+            """.format(days), (local_date,))
+            return [{"id": row[0], "date": row[1], "exercise_name": row[2], "reps": row[3], "set_number": row[4]} 
+                   for row in cursor.fetchall()]
+    
+    def update_workout_reps(self, workout_id: int, new_reps: int) -> bool:
+        """Update the number of reps for a specific workout entry."""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    UPDATE workouts 
+                    SET reps = ? 
+                    WHERE id = ?
+                """, (new_reps, workout_id))
+                conn.commit()
+                return cursor.rowcount > 0
+        except sqlite3.Error as e:
+            print(f"Error updating workout reps: {e}")
+            return False
+    
+    def delete_workout_entry(self, workout_id: int) -> bool:
+        """Delete a specific workout entry."""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("DELETE FROM workouts WHERE id = ?", (workout_id,))
+                conn.commit()
+                return cursor.rowcount > 0
+        except sqlite3.Error as e:
+            print(f"Error deleting workout entry: {e}")
+            return False
+    
+    def get_monthly_reps(self, months: int = 12) -> List[Dict]:
+        """Get monthly totals for the last N months."""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            # Get the last N months of data
+            cursor.execute("""
+                SELECT strftime('%Y-%m', date) as month, SUM(reps) as total
+                FROM workouts
+                WHERE date >= datetime('now', '-{} months')
+                GROUP BY strftime('%Y-%m', date)
+                ORDER BY month DESC
+                LIMIT ?
+            """.format(months), (months,))
+            
+            results = []
+            for row in cursor.fetchall():
+                month_str = row[0]
+                # Convert YYYY-MM to a more readable format
+                year, month = month_str.split('-')
+                month_name = datetime(int(year), int(month), 1).strftime('%b %Y')
+                results.append({
+                    "month": month_name,
+                    "total": row[1] or 0
+                })
+            
+            return results
