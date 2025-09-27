@@ -28,9 +28,9 @@ set -euo pipefail
 PROJECT_DIR="__PROJECT_DIR__"
 cd "$PROJECT_DIR"
 if command -v uv >/dev/null 2>&1; then
-  exec uv run hw.py "$@"
+  exec uv run src/heraclis/hw.py "$@"
 else
-  exec python3 hw.py "$@"
+  exec python3 src/heraclis/hw.py "$@"
 fi
 SH
 
