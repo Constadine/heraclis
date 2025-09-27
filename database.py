@@ -1,22 +1,21 @@
 #!/usr/bin/env python3
+# Python 3.13 styling conventions applied
 """
 Database module for home workout logging app.
 Handles SQLite database operations for workouts and exercises.
 """
 
-import sqlite3
-import os
 from datetime import datetime, timedelta
-from typing import List, Dict, Optional
+import sqlite3
 
 
 class WorkoutDB:
-    def __init__(self, db_path: str = "workouts.db"):
+    def __init__(self, db_path: str = "workouts.db") -> None:
         """Initialize the database connection and create tables if they don't exist."""
         self.db_path = db_path
         self.init_database()
     
-    def init_database(self):
+    def init_database(self) -> None:
         """Create the database and tables if they don't exist."""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
@@ -213,7 +212,7 @@ class WorkoutDB:
             print(f"Error adding workout: {e}")
             return False
     
-    def get_exercises(self) -> List[Dict]:
+    def get_exercises(self) -> list[dict]:
         """Get all available exercises with their tags."""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
@@ -260,7 +259,7 @@ class WorkoutDB:
             print(f"Error adding exercise: {e}")
             return False
     
-    def get_recent_workouts(self, days: int = 7) -> List[Dict]:
+    def get_recent_workouts(self, days: int = 7) -> list[dict]:
         """Get recent workouts from the last N days."""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
@@ -275,7 +274,7 @@ class WorkoutDB:
             return [{"date": row[0], "exercise_name": row[1], "reps": row[2], "set_number": row[3]} 
                    for row in cursor.fetchall()]
     
-    def get_stats(self) -> Dict:
+    def get_stats(self) -> dict:
         """Get workout statistics."""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
@@ -342,7 +341,7 @@ class WorkoutDB:
                 "total_reps_per_exercise": total_reps_per_exercise
             }
 
-    def get_progress_overview(self) -> Dict:
+    def get_progress_overview(self) -> dict:
         """Return weekly/monthly progress compared to previous periods.
 
         Uses rolling 7-day window for "this week" and the preceding 7 days for "last week".
@@ -385,7 +384,7 @@ class WorkoutDB:
                 WHERE strftime('%Y-%m', date) = ?
                 """, (this_month,)
             )
-            this_month = cursor.fetchone()[0] or 0
+            this_month_val = cursor.fetchone()[0] or 0
 
             # Last month
             cursor.execute(
@@ -395,19 +394,19 @@ class WorkoutDB:
                 WHERE strftime('%Y-%m', date) = ?
                 """, (last_month,)
             )
-            last_month = cursor.fetchone()[0] or 0
+            last_month_val = cursor.fetchone()[0] or 0
 
-            def change(a: int, b: int) -> Dict:
+            def change(a: int, b: int) -> dict:
                 diff = a - b
                 pct = (diff / b * 100) if b > 0 else (100 if a > 0 else 0)
                 return {"current": a, "previous": b, "diff": diff, "pct": pct}
 
             return {
                 "week": change(this_week, last_week),
-                "month": change(this_month, last_month),
+                "month": change(this_month_val, last_month_val),
             }
 
-    def get_daily_reps(self, days: int = 7) -> List[Dict]:
+    def get_daily_reps(self, days: int = 7) -> list[dict]:
         """Return a list of daily totals for the last N days (including today)."""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
@@ -426,14 +425,14 @@ class WorkoutDB:
             raw = {row[0]: row[1] for row in cursor.fetchall()}
 
             # Build full sequence with zeros for missing days
-            result: List[Dict] = []
+            result: list[dict] = []
             for i in range(days - 1, -1, -1):
                 day = datetime.now().date().fromordinal(datetime.now().date().toordinal() - i)
                 day_str = day.isoformat()
                 result.append({"date": day_str, "total": int(raw.get(day_str, 0))})
             return result
     
-    def get_exercise_by_id(self, exercise_id: int) -> Optional[Dict]:
+    def get_exercise_by_id(self, exercise_id: int) -> dict | None:
         """Get exercise details by ID with tags."""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
@@ -465,7 +464,7 @@ class WorkoutDB:
                 return exercise
             return None
     
-    def get_exercise_by_name(self, exercise_name: str) -> Optional[Dict]:
+    def get_exercise_by_name(self, exercise_name: str) -> dict | None:
         """Get exercise details by name with tags."""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
@@ -497,7 +496,7 @@ class WorkoutDB:
                 return exercise
             return None
     
-    def get_all_tags(self) -> List[Dict]:
+    def get_all_tags(self) -> list[dict]:
         """Get all available tags."""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
@@ -531,7 +530,7 @@ class WorkoutDB:
             print(f"Error updating tag color: {e}")
             return False
     
-    def add_exercise_with_tags(self, name: str, description: str = "", tag_names: List[str] = None) -> bool:
+    def add_exercise_with_tags(self, name: str, description: str = "", tag_names: list[str] | None = None) -> bool:
         """Add a new exercise with tags."""
         if tag_names is None:
             tag_names = []
@@ -572,7 +571,7 @@ class WorkoutDB:
             print(f"Error adding exercise: {e}")
             return False
     
-    def update_exercise_tags(self, exercise_id: int, tag_names: List[str]) -> bool:
+    def update_exercise_tags(self, exercise_id: int, tag_names: list[str]) -> bool:
         """Update tags for an existing exercise."""
         try:
             with sqlite3.connect(self.db_path) as conn:
@@ -583,13 +582,11 @@ class WorkoutDB:
                 
                 # Add new tags
                 for tag_name in tag_names:
-                    # Get or create tag
                     cursor.execute("SELECT id FROM tags WHERE name = ?", (tag_name,))
                     tag_row = cursor.fetchone()
                     if tag_row:
                         tag_id = tag_row[0]
                     else:
-                        # Create new tag with default color
                         cursor.execute("INSERT INTO tags (name) VALUES (?)", (tag_name,))
                         tag_id = cursor.lastrowid
                     
@@ -605,7 +602,7 @@ class WorkoutDB:
             print(f"Error updating exercise tags: {e}")
             return False
     
-    def get_exercises_by_tag(self, tag_name: str) -> List[Dict]:
+    def get_exercises_by_tag(self, tag_name: str) -> list[dict]:
         """Get all exercises that have a specific tag."""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
@@ -637,8 +634,8 @@ class WorkoutDB:
                     ]
                 exercises.append(exercise)
             return exercises
-    # Goal management methods
-    def get_goals(self) -> List[Dict]:
+    
+    def get_goals(self) -> list[dict]:
         """Get all active goals with exercise information."""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
@@ -665,7 +662,7 @@ class WorkoutDB:
                 })
             return goals
     
-    def get_goal_by_exercise_id(self, exercise_id: int) -> Optional[Dict]:
+    def get_goal_by_exercise_id(self, exercise_id: int) -> dict | None:
         """Get goal for a specific exercise."""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
@@ -721,7 +718,7 @@ class WorkoutDB:
             print(f"Error updating goal: {e}")
             return False
     
-    def get_goal_progress(self, exercise_id: int) -> Dict:
+    def get_goal_progress(self, exercise_id: int) -> dict:
         """Get progress towards daily and weekly goals for an exercise."""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
@@ -767,7 +764,7 @@ class WorkoutDB:
                 "weekly_remaining": max(goal['weekly_target'] - week_reps, 0)
             }
     
-    def get_all_goal_progress(self) -> List[Dict]:
+    def get_all_goal_progress(self) -> list[dict]:
         """Get progress for all active goals."""
         goals = self.get_goals()
         progress_list = []
@@ -787,7 +784,7 @@ class WorkoutDB:
             cursor.execute("DELETE FROM todays_schedule")
             conn.commit()
     
-    def set_todays_schedule(self, exercises_with_reps: List[tuple]):
+    def set_todays_schedule(self, exercises_with_reps: list[tuple]) -> None:
         """Set today's schedule with exercises and suggested reps.
         
         Args:
@@ -808,7 +805,7 @@ class WorkoutDB:
             
             conn.commit()
     
-    def get_todays_schedule(self) -> List[Dict]:
+    def get_todays_schedule(self) -> list[dict]:
         """Get today's schedule with exercise details."""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
@@ -862,7 +859,7 @@ class WorkoutDB:
             """, (schedule_id,))
             conn.commit()
     
-    def get_schedule_progress(self) -> Dict:
+    def get_schedule_progress(self) -> dict:
         """Get progress statistics for today's schedule."""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
@@ -969,7 +966,7 @@ class WorkoutDB:
             print(f"Error removing exercise from schedule: {e}")
             return False
     
-    def get_available_exercises_for_schedule(self) -> List[Dict]:
+    def get_available_exercises_for_schedule(self) -> list[dict]:
         """Get exercises that are not already in today's schedule."""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
@@ -1005,7 +1002,7 @@ class WorkoutDB:
                 exercises.append(exercise)
             return exercises
     
-    def get_workout_entries(self, days: int = 7) -> List[Dict]:
+    def get_workout_entries(self, days: int = 7) -> list[dict]:
         """Get workout entries with IDs for editing purposes."""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
@@ -1048,7 +1045,7 @@ class WorkoutDB:
             print(f"Error deleting workout entry: {e}")
             return False
     
-    def get_monthly_reps(self, months: int = 12) -> List[Dict]:
+    def get_monthly_reps(self, months: int = 12) -> list[dict]:
         """Get monthly totals for the last N months."""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
