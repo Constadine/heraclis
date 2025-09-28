@@ -8,6 +8,7 @@ dependencies = [
     "rich",
     "click",
     "sqlalchemy>=2.0.43",
+    "fastapi[standard]>=0.117.1",
 ]
 
 [project.scripts]
