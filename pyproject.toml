@@ -8,7 +8,9 @@ dependencies = [
     "rich",
     "click",
     "sqlalchemy>=2.0.43",
+    "bcrypt==4.3.0",
     "fastapi[standard]>=0.117.1",
+    "passlib[bcrypt]>=1.7.4",
 ]
 
 [project.scripts]

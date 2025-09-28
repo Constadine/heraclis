@@ -1,15 +1,64 @@
-from fastapi import FastAPI, HTTPException, status
+from typing import Annotated, Sequence
 
-from heraclis.database import WorkoutDB
+from fastapi import Depends, FastAPI, Form, HTTPException, status
+from passlib.context import CryptContext
+from sqlalchemy import create_engine, select
+from sqlalchemy.orm import Session, sessionmaker
+
+from heraclis.models import DB_URL, Exercise, User
+from heraclis.schemas import UserData
+
+engine = create_engine(DB_URL)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+
+def session():
+    sess = SessionLocal()
+    try:
+        yield sess
+    finally:
+        sess.close()
+
 
 app = FastAPI()
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+sess = Annotated[Session, Depends(session)]
 
-db = WorkoutDB()
+
+def get_user_by_name(name: str, session: Session, response_model=UserData):
+    user = session.scalar(select(User).where(User.username == name))
+    return user
+
+
+@app.get("/users/get/{name}", response_model=UserData)
+def get_user(username: str, session: sess) -> User:
+    user = get_user_by_name(username, session)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"User '{username}' does not exist",
+        )
+    return user
+
+
+@app.post("/users/create", response_model=UserData)
+def create_user(
+    username: Annotated[str, Form()], password: Annotated[str, Form()], session: sess
+) -> User:
+    hashed_password = pwd_context.hash(password)
+    user = get_user_by_name(username, session)
+    if user:
+        raise HTTPException(status_code=409, detail=f"User '{username}' already exists")
+    user = User(username=username, hashed_password=hashed_password)
+    session.add(user)
+    session.commit()
+    session.refresh(user)
+    return user
 
 
 @app.get("/exercises")
-def read_exercises():
-    exercises = db.get_exercises()
+def read_exercises(session: sess):
+    exercises = session.scalars(select(Exercise)).all()
     if not exercises:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="No exercises found"
@@ -18,17 +67,12 @@ def read_exercises():
 
 
 @app.get("/exercises/{name}")
-def read_exercise(name: str):
-    exercise = db.get_exercise_by_name(name)
+def read_exercise(name: str, session: sess):
+    exercise = session.scalar(select(Exercise).filter_by(name=name))
     if not exercise:
-        available = [_["name"] for _ in db.get_exercises()]
-        if not available:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="No exercises found"
-            )
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"No exercise with name '{name}'. Avalable exercises: {available}",
+            detail=f"No exercise found named {name}",
         )
     return exercise
 

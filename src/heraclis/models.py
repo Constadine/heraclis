@@ -9,7 +9,6 @@ from datetime import datetime
 
 from sqlalchemy import (
     Boolean,
-    Column,
     DateTime,
     ForeignKey,
     Integer,
@@ -19,6 +18,9 @@ from sqlalchemy import (
     select,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+from sqlalchemy.schema import Column
+
+DB_URL = "sqlite:///heraclis.db"
 
 
 class Base(DeclarativeBase):
@@ -40,10 +42,10 @@ class User(Base):
     __tablename__ = "users"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    username: Mapped[str] = mapped_column(String)
-    # New relationships for user-specific workouts and goals
+    username: Mapped[str] = mapped_column(String, unique=True)
     workouts: Mapped[list["Workout"]] = relationship("Workout", back_populates="user")
     goals: Mapped[list["Goal"]] = relationship("Goal", back_populates="user")
+    hashed_password: Mapped[str]
 
     def __repr__(self) -> str:
         return f"<User(id={self.id}, username={self.username})>"
@@ -139,9 +141,9 @@ class TodaysSchedule(Base):
 
 if __name__ == "__main__":
     from sqlalchemy import create_engine
-    from sqlalchemy.orm import Session
 
-    engine = create_engine("sqlite:///heraclis.db")
+    engine = create_engine(DB_URL)
+    from sqlalchemy.orm import Session
 
     def init_default_tags():
         with Session(engine) as session:
