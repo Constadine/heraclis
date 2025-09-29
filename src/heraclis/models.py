@@ -1,26 +1,40 @@
 #!/usr/bin/env python3
 """
-SQLAlchemy models for the Heraclis project using SQLAlchemy 2.0 style with mapped_column and type hints.
+SQLAlchemy models using SQLAlchemy 2.0 style with mapped_column and type hints.
 """
 
-from __future__ import annotations
-
+import os
 from datetime import datetime
 
 from sqlalchemy import (
     Boolean,
     DateTime,
+    Engine,
     ForeignKey,
     Integer,
     String,
     Table,
     Text,
+    create_engine,
     select,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from sqlalchemy.schema import Column
 
-DB_URL = "sqlite:///heraclis.db"
+
+def get_db_url():
+    """Get the database URL from an env var to allow for easy (and early) testing configuration via pytest_configure hook"""
+    return os.environ["DB_URL"]
+
+
+_engine = None
+
+
+def get_engine() -> Engine:
+    global _engine
+    if _engine is None:
+        _engine = create_engine(get_db_url())
+    return _engine
 
 
 class Base(DeclarativeBase):
@@ -75,12 +89,12 @@ class Exercise(Base):
     description: Mapped[str | None] = mapped_column(Text)
 
     # Many-to-many relationship with Tag
-    tags: Mapped[list[Tag]] = relationship(
+    tags: Mapped[list["Tag"]] = relationship(
         "Tag", secondary=exercise_tags, back_populates="exercises"
     )
 
     # One-to-many relationship with Goal
-    goals: Mapped[list[Goal]] = relationship("Goal", back_populates="exercise")
+    goals: Mapped[list["Goal"]] = relationship("Goal", back_populates="exercise")
 
     def __repr__(self) -> str:
         return f"<Exercise(id={self.id}, name={self.name})>"

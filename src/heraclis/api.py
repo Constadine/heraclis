@@ -1,14 +1,14 @@
-from typing import Annotated, Sequence
+from typing import Annotated
 
 from fastapi import Depends, FastAPI, Form, HTTPException, status
 from passlib.context import CryptContext
-from sqlalchemy import create_engine, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
-from heraclis.models import DB_URL, Exercise, User
+from heraclis.models import Exercise, User, get_engine
 from heraclis.schemas import UserData
 
-engine = create_engine(DB_URL)
+engine = get_engine()
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
@@ -25,7 +25,7 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 sess = Annotated[Session, Depends(session)]
 
 
-def get_user_by_name(name: str, session: Session, response_model=UserData):
+def get_user_by_name(name: str, session: Session):
     user = session.scalar(select(User).where(User.username == name))
     return user
 
