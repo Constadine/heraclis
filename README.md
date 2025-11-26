@@ -27,7 +27,7 @@ For Linux users, the recommended way to install HeraCLIs is by using the provide
 
 1.  Clone the repository:
     ```bash
-    git clone https://github.com/your-username/heraclis.git
+    git clone https://github.com/Constadine/heraclis.git
     cd heraclis
     ```
 
