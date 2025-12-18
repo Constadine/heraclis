@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # Installer for Home Workout Logger
-# - Creates a wrapper in ~/.local/bin/hw
+# - Creates a wrapper in ~/.local/bin/heraclis
 # - Creates a desktop entry in ~/.local/share/applications
 # - Uses uv if available, otherwise falls back to python3
 
@@ -10,7 +10,7 @@ set -euo pipefail
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 APP_NAME="HeraCLIs"
 APP_ID="heraclis"
-WRAPPER_NAME="hw"
+WRAPPER_NAME="heraclis"
 BIN_DIR="$HOME/.local/bin"
 DESKTOP_DIR="$HOME/.local/share/applications"
 DESKTOP_FILE="$DESKTOP_DIR/${APP_ID}.desktop"
@@ -28,9 +28,9 @@ set -euo pipefail
 PROJECT_DIR="__PROJECT_DIR__"
 cd "$PROJECT_DIR"
 if command -v uv >/dev/null 2>&1; then
-  exec uv run hw.py "$@"
+  exec uv run heraclis.py "$@"
 else
-  exec python3 hw.py "$@"
+  exec python3 heraclis.py "$@"
 fi
 SH
 
