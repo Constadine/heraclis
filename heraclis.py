@@ -1126,7 +1126,7 @@ def edit_logged_reps():
             return
 
         # Find the selected entry using the mapping
-        selected_entry = id_mapping.get(display_id)
+        selected_entry = id_mapping.get(int(display_id))
         if not selected_entry:
             console.print("[red]Invalid entry number[/red]")
             return
