@@ -35,7 +35,7 @@ For Linux users, the recommended way to install HeraCLIs is by using the provide
     ```bash
     ./install_desktop.sh
     ```
-    This script will create a launcher at `~/.local/bin/hw` and a desktop file. You can then run the application by typing `hw` in your terminal or by finding "HeraCLIs" in your application menu.
+    This script will create a launcher at `~/.local/bin/heraclis` and a desktop file. You can then run the application by typing `heraclis` in your terminal or by finding "HeraCLIs" in your application menu.
 
 ### Manual Installation (All Platforms)
 
@@ -53,16 +53,19 @@ You can also install the application manually. Using a virtual environment is hi
     source .venv/bin/activate
     ```
 
-3.  Install the dependencies:
+3.  Install the package in development mode:
     ```bash
-    pip install . # or: uv pip install -e .
+    pip install -e . # or: uv pip install -e .
     ```
 
 4.  Now you can run the application:
     ```bash
-    python3 hw.py
+    hw
     ```
-    To make it easier to run, you can create an alias or a symlink.
+    Or alternatively:
+    ```bash
+    python3 -m heraclis.hw
+    ```
 
 ## Usage
 
