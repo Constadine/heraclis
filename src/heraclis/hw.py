@@ -17,7 +17,7 @@ from rich.progress import (
     TimeRemainingColumn,
     TimeElapsedColumn,
 )
-from database import WorkoutDB
+from heraclis.database import WorkoutDB
 from datetime import datetime
 import time
 import os

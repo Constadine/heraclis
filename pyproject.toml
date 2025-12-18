@@ -8,3 +8,10 @@ dependencies = [
     "rich",
     "click",
 ]
+
+[project.scripts]
+hw = "heraclis.hw:cli"
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
